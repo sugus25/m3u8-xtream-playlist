@@ -1,22 +1,11 @@
 #EXTM3U
-https://github.com/enterprises/djtonor23010.m3u
+https://raw.githubusercontent.com/sugus25/m3u8-xtream-playlist/refs/heads/main/dociptv.m3u"
 
-http://proxyserver.com:8080/iptv.m3u?(
-#EXTVLCOPT:http-referrer=https://dookeela.live/
-https://radio.tvjaa.com/COOL%20fahrenheit
+#EXTINF:-1 group-title="JAV" tvg-logo="https://static.thaicom.io/chbig/big_292_20240122031500.png",DOXZILLA
+https://edge16.thaicom.io/v3/td/Doxzilla/playlist.m3u8?uuid=d8e9c86d-d573-4e2f-97cb-bd1c1201a8d6&device=loox-web&token=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJ1dWlkIjoiZDhlOWM4NmQtZDU3My00ZTJmLTk3Y2ItYmQxYzEyMDFhOGQ2IiwiY2hhbm5lbCI6IkRveHppbGxhIiwicXVhbGl0eSI6IkExIiwiaWF0IjoxNzMzOTc5Mjc4LCJuYmYiOjE3MzM5NzkyNzgsImV4cCI6MTczNDAwODA3OH0.gYwbP05f7392pRSsKC4Iu819XM-rkNSgxY5DEY2kcbE
 
-00RESP: #EXTM3U
-#EXT-X-VERSION:3
-#EXT-X-TARGETDURATION:7
-#EXT-X-MEDIA-SEQUENCE:0
-#EXTINF:2,
-l_11621836_241918749_0.ts?nimblesessionid=5719830&wmsAuthSign=c2VydmVyX3RpbWU9MTIvMTIvMjAyNCAzOjUxOjMyIEFNJmhhc2hfdmFsdWU9WGxQcmMwV3NSUmFjRmVmZzNtYUloQT09JnZhbGlkbWludXRlcz0yMA==
-#EXTINF:7,
-l_11621836_241920749_1.ts?nimblesessionid=5719830&wmsAuthSign=c2VydmVyX3RpbWU9MTIvMTIvMjAyNCAzOjUxOjMyIEFNJmhhc2hfdmFsdWU9WGxQcmMwV3NSUmFjRmVmZzNtYUloQT09JnZhbGlkbWludXRlcz0yMA7jqs-xQCLcBGAs/s1600/AW0980007_00.gif"
+#EXTINF:-1 group-title="JAV" tvg-logo="https://dookeela.live/uploads/1705536821.png",สำรวจโลก
+https://dookeela.live/live-tv/samrujlok#
 
-
-#EXTFIN:8,"https://dkl-o53d.cdn.akamaiz.com/goalthcom_x5/mysci/chunks.m3u8?nimblesessionid=5719830&wmsAuthSign=c2VydmVyX3RpbWU9MTIvMTIvMjAyNCAzOjUxOjMyIEFNJmhhc2hfdmFsdWU9WGxQcmMwV3NSUmFjRmVmZzNtYUloQT09JnZhbGlkbWludXRlcz0yMA
-
-
-
-http://proxyserver.com:8080/iptv.m3u?
+#EXTINF:-1 group-title="JAV" tvg-logo="https://dookeela.live/uploads/1705536991.png",MYSCI
+https://dookeela.live/live-tv/mysci
