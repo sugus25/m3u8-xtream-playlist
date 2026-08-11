@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Fullscreen Video - แยกหมวดหมู่</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #121212;
+    color: #eee;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  }
+
+  header {
+    background-color: #111;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.7);
+    gap: 16px;
+  }
+
+  .running-text-container {
+    flex: 1;
+    overflow: hidden;
+    white-space: nowrap;
+    position: relative;
+    height: 48px;
+  }
+  .running-text {
+    display: inline-block;
+    padding-left: 100%;
+    animation: marquee 15s linear infinite;
+    font-size: 20px;
+    font-weight: 600;
+    color: #fff;
+    line-height: 48px;
+  }
+  @keyframes marquee {
+    0% { transform: translateX(0); }
+    100% { transform: translateX(-100%); }
+  }
+
+  #videoContainer {
+    width: 100%;
+    max-width: 900px;
+    margin: 20px auto;
+    background: #000;
+    padding: 10px;
+    border-radius: 8px;
+  }
+  #videoPlayer {
+    width: 100%;
+    aspect-ratio: 16/9;
+    background: #000;
+  }
+  .input-area {
+    margin: 10px 0;
+    display: flex;
+    gap: 8px;
+  }
+  .input-area input {
+    flex: 1;
+    padding: 8px;
+    font-size: 14px;
+    border-radius: 4px;
+    border: none;
+  }
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .button {
+    cursor: pointer;
+    padding: 8px 14px;
+    border: none;
+    background: #0f62fe;
+    color: #fff;
+    border-radius: 5px;
+    transition: background 0.2s;
+  }
+  .button:hover { background: #005fcc; }
+
+  /* === ส่วนหมวดหมู่ === */
+  .category-tab {
+    max-width: 900px;
+    margin: 0 auto;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px;
+  }
+  .category-btn {
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid #444;
+    background: #222;
+    color: #ccc;
+    cursor: pointer;
+    transition: all 0.25s;
+  }
+  .category-btn:hover,
+  .category-btn.active {
+    background: #0f62fe;
+    color: #fff;
+    border-color: #0f62fe;
+  }
+
+  /* === รายการช่อง === */
+  #channelList {
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto 40px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 12px;
+    padding: 10px;
+  }
+  .channel-item {
+    cursor: pointer;
+    background: #222;
+    border-radius: 8px;
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.25s ease;
+  }
+  .channel-item:hover,
+  .channel-item.active {
+    background-color: #0f62fe;
+    transform: scale(1.03);
+  }
+  .channel-item img {
+    width: 60px;
+    height: 36px;
+    object-fit: contain;
+    border-radius: 4px;
+  }
+  .channel-name {
+    font-size: 15px;
+    font-weight: 600;
+    color: #eee;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* ซ่อนกลุ่มที่ไม่ได้เลือก */
+  .channel-group { display: contents; }
+  .channel-group.hidden { display: none; }
+
+  @media (max-width: 600px) {
+    #channelList { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+    .channel-item img { width: 48px; height: 28px; }
+    .channel-name { font-size: 13px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="running-text-container">
+    <div class="running-text">
+      <script>
+        const days = ['วันอาทิตย์','วันจันทร์','วันอังคาร','วันพุธ','วันพฤหัสบดี','วันศุกร์','วันเสาร์'];
+        const months = ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'];
+        const t = new Date();
+        document.write(`${days[t.getDay()]} ที่ ${t.getDate()} ${months[t.getMonth()]} พ.ศ. ${t.getFullYear()+543}`);
+      </script> — เวลา: <span id="time"></span>
+    </div>
+  </div>
+</header>
+
+<script>
+setInterval(()=>{
+  document.getElementById("time").textContent = new Date().toLocaleTimeString('th-TH');
+},1000);
+</script>
+
+<!-- เครื่องเล่นวิดีโอ -->
+<div id="videoContainer">
+  <video id="videoPlayer" controls></video>
+  <div class="input-area">
+    <input type="text" id="videoInput" placeholder="📋 วางลิงก์ .m3u8 หรือ URL วิดีโอ แล้วกด ▶ เล่น" />
+    <button class="button" id="loadVideoBtn">▶ เล่น</button>
+  </div>
+  <div class="controls">
+    <button class="button" id="stretch">Stretch</button>
+    <button class="button" id="crop">Crop</button>
+    <button class="button" id="zoom">Zoom</button>
+    <button class="button" id="fullscreen">เต็มจอ</button>
+  </div>
+</div>
+
+<!-- แถบเลือกหมวดหมู่ -->
+<div class="category-tab" id="categoryTab">
+  <button class="category-btn active" data-category="all">ทั้งหมด</button>
+</div>
+
+<!-- รายการช่อง แยกตามกลุ่ม -->
+<div id="channelList"></div>
+
+<script>
+// === ข้อมูล M3U ===
+const m3uData = `
+#EXTM3U
+
+#EXTINF:-1 tvg-id="iptv36.tv5" tvg-name="CH 5" tvg-logo="https://cdn.imgchest.com/files/a31d18346fa4.jpg" group-title="ดิจิตอลทีวี",ไทยรัฐ ทีวี
+http://45.144.166.242:1935/ThairathTV/t3_thairathtv/playlist.m3u8
+#EXTINF:-1 tvg-id="" tvg-name="COOL fahrenheit" tvg-logo="http://103.114.203.129:8080/images/b03bbbd97434d87e1023d1acc03c67cb.png" group-title="ดิจิตอลทีวี",COOL fahrenheit
+http://103.114.203.129:8080/toom/12345/5391
+
+#EXTINF:-1 tvg-logo="https://s3.dooflixlive.com/assets/images/tv/digital/3hd.png" group-title="ดิจิตอลทีวี",CH 3 HD
+https://live-us1.thaimomo.com/live-as/ch3hd-3/chunklist_w1630241822.m3u8
+#EXTINF:-1 tvg-logo="https://s3.dooflixlive.com/assets/images/tv/digital/5hd.png" group-title="ดิจิตอลทีวี",CH 5 HD
+https://hls.iptv-th.workers.dev/live/128/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://s3.dooflixlive.com/assets/images/tv/digital/7hd.png" group-title="ดิจิตอลทีวี",CH 7 HD
+https://live-cdn.ch7.com/out/v1/eafeb02c55b64a15b278b1e66c7fc776/playlist_9.m3u8
+#EXTINF:-1 tvg-logo="https://s3.dooflixlive.com/assets/images/tv/digital/8.png" group-title="ดิจิตอลทีวี",CH 8
+https://live-us1.thaimomo.com/live-as/cheight-3/chunklist_w808511203.m3u8
+#EXTINF:-1 tvg-logo="https://s3.dooflixlive.com/assets/images/tv/digital/mcot.png" group-title="ดิจิตอลทีวี",MCOT HD
+https://hls.iptv-th.workers.dev/live/133/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://s3.dooflixlive.com/assets/images/tv/digital/nbt.png" group-title="ดิจิตอลทีวี",NBT
+https://hls.iptv-th.workers.dev/live/136/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://s3.dooflixlive.com/assets/images/tv/CAJw7MUj99UhevPkGY0kbT0ER33XBhethairath.png" group-title="ดิจิตอลทีวี",Thai Rath HD
+https://hls.iptv-th.workers.dev/live/141/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://s3.dooflixlive.com/assets/images/tv/digital/tnn.png" group-title="ดิจิตอลทีวี",TNN 24
+https://hls.iptv-th.workers.dev/live/142/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://s3.dooflixlive.com/assets/images/tv/digital/one.png" group-title="ดิจิตอลทีวี",ONE HD
+https://hls.iptv-th.workers.dev/live/138/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://s3.dooflixlive.com/assets/images/tv/digital/thaipbs.png" group-title="ดิจิตอลทีวี",Thai PBS
+https://hls.iptv-th.workers.dev/live/140/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://s3.dooflixlive.com/assets/images/tv/digital/topnews.png" group-title="ดิจิตอลทีวี",Top News
+https://hls.iptv-th.workers.dev/live/143/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://s3.dooflixlive.com/assets/images/tv/digital/pptv.png" group-title="ดิจิตอลทีวี",PPTV HD
+https://hls.iptv-th.workers.dev/live/139/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://s3.dooflixlive.com/assets/images/tv/digital/amarin.png" group-title="ดิจิตอลทีวี",Amarin TV HD
+https://hls.iptv-th.workers.dev/live/130/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://s3.dooflixlive.com/assets/images/tv/digital/workpoint.png" group-title="ดิจิตอลทีวี",Work Point TV
+https://hls.iptv-th.workers.dev/live/146/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://s3.dooflixlive.com/assets/images/tv/digital/gmm.png" group-title="ดิจิตอลทีวี",GMM 25
+https://hls.iptv-th.workers.dev/live/132/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://s3.dooflixlive.com/assets/images/tv/digital/mono.png" group-title="ดิจิตอลทีวี",MONO 29
+https://hls.iptv-th.workers.dev/live/134/playlist.m3u8
+
+#EXTINF:-1 tvg-id="Discovery.Channel.th" tvg-name="DISCOVERY TH" tvg-logo="http://103.114.203.129:8080/images/57556f549cb48e859cda9bb6a21bacf9.jpg" group-title="ช่องสารคดี",DISCOVERY TH
+http://103.114.203.129:8080/toom/12345/47
+
+#EXTINF:-1 tvg-id="HISTORY.th" tvg-name="HISTORY TH" tvg-logo="http://103.114.203.129:8080/images/ef78276dcf48f478c9d823641c3cd607.jpg" group-title="ช่องสารคดี",HISTORY TH
+http://103.114.203.129:8080/toom/12345/48
+
+#EXTINF:-1 tvg-id="th" group-title="ช่องสารคดี" tvg-logo="https://i.postimg.cc/rFscPFcF/IMG-2948.png", World Animal
+http://49.0.64.96:8007/Animal
+
+#EXTINF:-1 group-title="ช่องสารคดี" tvg-logo="https://i.postimg.cc/5yFyB8yK/IMG-3100.png", World Science
+http://49.0.64.96:8007/WSCI
+
+#EXTINF:-1 group-title="ช่องภาพยนตร์" tvg-logo="https://www.fileinw.com/postor/20240429213343just_for_laughs_gags.jpg",GAGS
+https://distributionsjustepourrire-justforlaughsgags-1-us.tcl.wurl.tv/playlist.m3u8
+
+#EXTINF:-1 tvg-id="Mono29.Plus.th" tvg-name="MONO-PLUS" tvg-logo="http://103.114.203.129:8080/images/845167c7862eca223d966682b27bb234.jpg" group-title="ช่องภาพยนตร์",MONO-PLUS
+http://103.114.203.129:8080/toom/12345/1709
+#EXTINF:-1 tvg-id="HBO.th" tvg-name="HBO THAI" tvg-logo="http://103.114.203.129:8080/images/6ca605278a49e9c4b6602bf18bfeb265.jpg" group-title="ช่องภาพยนตร์",HBO THAI
+http://103.114.203.129:8080/toom/12345/77
+
+#EXTINF:-1 tvg-id="C1.49.tunarr.com" tvg-name="iPlay MEDIA" tvg-logo="http://m7smarter.ddns.net/ทีวีพิเศษ/iplay.png" group-title="ทีวีพิเศษ",iPlay MEDIA
+http://mooseven.ddns.net:8080/test/testm7/37875
+
+#EXTINF:-1 tvg-id="" tvg-name="M7 ซีรีย์อินเตอร์" tvg-logo="http://m7smarter.ddns.net/ทีวีพิเศษ/ซีรีย์อินเตอร์.png" group-title="ทีวีพิเศษ",M7 ซีรีย์อินเตอร์
+http://mooseven.ddns.net:8080/test/testm7/101611
+
+#EXTINF:-1 tvg-id="C4.52.tunarr.com" tvg-name="M7 ละครไทย" tvg-logo="http://m7smarter.ddns.net/ทีวีพิเศษ/ละครไทย.png" group-title="ทีวีพิเศษ",M7 ละครไทย
+http://mooseven.ddns.net:8080/test/testm7/119703
+
+#EXTINF:-1 tvg-id="C2.50.tunarr.com" tvg-name="M7 หนังอินเตอร์" tvg-logo="http://m7smarter.ddns.net/ทีวีพิเศษ/หนังอินเตอร์.png" group-title="ทีวีพิเศษ",M7 หนังอินเตอร์
+http://mooseven.ddns.net:8080/test/testm7/119704
+
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/tCz5uOf1XPW1RLITmCX46urCatF7NbI20250830165328Mono1.jpg" group-title="Top Channel",MonoMax 1
+https://hls.iptv-th.workers.dev/live/3912/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/2YYftpZ0wnosCHE1EIgZf5ktfrimdGJ20250830165343Mono2.jpg" group-title="Top Channel",MonoMax 2
+https://hls.iptv-th.workers.dev/live/3911/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/gyuyxpMF6QxUlTTiVwrdAj1BnkJxzZa20240418192615Bein1.jpg" group-title="Top Channel",Bein Sport 1
+https://hls.iptv-th.workers.dev/live/3648/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/PaIhSj5IgqmG9bpEFTzq91kuqT1QNOx20240418192653Bein3.jpg" group-title="Top Channel",Bein Sport 3
+https://hls.iptv-th.workers.dev/live/3646/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/LsXNd0YLI36D9158SZzCKEV5Ew41FoNไม่มีชื่อ.png" group-title="Top Channel",LFC TV
+https://hls.iptv-th.workers.dev/live/3922/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/R23vfMQDFybbNPuaiXVslifns7FvwSL20250419153707MUTV.jpg" group-title="Top Channel",Mu TV
+https://hls.iptv-th.workers.dev/live/3960/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/1Ervzo24A48KRTrhArja3Oc06IV0oPG20240418191821ch3hd.jpg" group-title="ฟรีทีวี FreeTV",CH 3 HD
+https://hls.iptv-th.workers.dev/live/1057/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/nZH0LpJZb5OAgfUhp6sVadOvhnZpPh320240418185909ch7hd_(1).jpg" group-title="ฟรีทีวี FreeTV",CH 7 HD
+https://hls.iptv-th.workers.dev/live/1059/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/hRGNf51OPjUdkTqJUH7F9u7D1ttgBvj20240418185850ch5hd.jpg" group-title="ฟรีทีวี FreeTV",CH 5 HD
+https://hls.iptv-th.workers.dev/live/1058/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/dg4cPn0lmuRerdrEXo9a4EohjNtaqqD20240418190115True4u.jpg" group-title="ฟรีทีวี FreeTV",True 4 U
+https://true4u-p4ljv2.cdn.byteark.com/live/pl_720p/index.m3u8?x_ark_access_id=fleet-1890&x_ark_auth_type=ark-v2&x_ark_expires=1786488164&x_ark_path_prefix=%2Flive%2F&x_ark_signature=Hw4M5ZR8EiHHIMueqFyyNA
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/Xh9Vvxt3VDc2AVveQThvrSZPmsNZa8U20240418191253pptvhd.jpg" group-title="ฟรีทีวี FreeTV",PPTV HD
+https://hls.iptv-th.workers.dev/live/1011/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/C16pIyeDnV9x2R9V4DzDeES2hMsvXu520240418191809amarintvhd.jpg" group-title="ฟรีทีวี FreeTV",Amarin TV
+https://hls.iptv-th.workers.dev/live/1018/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/wK0lnULhkhSZq0C1b4Gm77FOO37rux720240418191350onehd.jpg" group-title="ฟรีทีวี FreeTV",ONE HD
+https://hls.iptv-th.workers.dev/live/1228/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/p1RBlYTtqPSNeXzfkM0EUCV9oXymdNA20240418190128gmmchannel.jpg" group-title="ฟรีทีวี FreeTV",GMM 25
+https://hls.iptv-th.workers.dev/live/1098/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/KLkKLHsc5TCE9xKr2uhfbKl4E50gTdq20240418191335ch8.jpg" group-title="ฟรีทีวี FreeTV",CH 8
+https://hls.iptv-th.workers.dev/live/1060/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/dhogVoGwkGXbl41VahO3KQn9X29RnCx20240418190941Workpoint.jpg" group-title="ฟรีทีวี FreeTV",Work Point TV
+https://hls.iptv-th.workers.dev/live/1227/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/3FtzbFnnW69QNPCYBIukhGeLMNnTWlt63d2e530-5999-11f1-9eae-09fe801bd2a9_webp_original.png" group-title="ฟรีทีวี FreeTV",MonoMax Sport
+https://hls.iptv-th.workers.dev/live/1229/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/zEllIKsvUq3Rrl9WKbrTfIzanTdcghd20240418191042mcothd.jpg" group-title="ฟรีทีวี FreeTV",MCOT HD
+https://hls.iptv-th.workers.dev/live/1010/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/B409CUlSj9PWt5j1waqxvv1VLfjFvOL20240418191323nbthd.jpg" group-title="ฟรีทีวี FreeTV",NBT
+https://hls.iptv-th.workers.dev/live/1007/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/rjck1OvG9oIkeWlc5LDWL0tFxGCb4PS20240418192308Nation1.jpg" group-title="ฟรีทีวี FreeTV",Nation 22 TV
+https://hls.iptv-th.workers.dev/live/1006/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/RXLAcYA06tQgoZnDsWLY1N4q5jYuA9o20240418191223tpbshd.jpg" group-title="ฟรีทีวี FreeTV",Thai PBS
+https://hls.iptv-th.workers.dev/live/1005/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/wIvpTVufwuomyCez38RtU10ql6ReqIX20240418191057thairahttvhd.jpg" group-title="ฟรีทีวี FreeTV",Thai Rath HD
+https://hls.iptv-th.workers.dev/live/1004/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/sC5Vce9wmuN8MOOQ3tCiA2qQfMRPBss20240418191206Topnews.jpg" group-title="ฟรีทีวี FreeTV",Top News
+https://hls.iptv-th.workers.dev/live/1186/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/z5heqnnm5MOENredeJKfZC2A2tXpGfe20240418193731tsports7.jpg" group-title="ฟรีทีวี FreeTV",T Sport 7
+https://hls.iptv-th.workers.dev/live/2734/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/WQba0HTE8tPWkD7LQQZHIQyQO47fUW120240418191939tptv.jpg" group-title="ฟรีทีวี FreeTV",โทรทัศน์รัฐสภา
+https://hls.iptv-th.workers.dev/live/1205/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/jAysDH1WGtTB9nFzNFQnMrTRvl8Met8news1.png" group-title="ฟรีทีวี FreeTV",News1
+https://hls.iptv-th.workers.dev/live/1206/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/TOzkL9EBJ7RA81DkRsjF1I77dhjEKwR20240418190014TNN16.jpg" group-title="ฟรีทีวี FreeTV",TNN 16
+https://hls.iptv-th.workers.dev/live/1003/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/hxyBnRtIMv1024dnT7G6BtJoIxLNlBm1781184838_7a6e27e58f846b847de1.jpg" group-title="กีฬา Sport",FiFa World Cup 1
+https://hls.iptv-th.workers.dev/live/4215/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/l1h914opzTN7Gsl7mdyBxCdnc5ZISXj1781185316_e7fee62e35baee27bd62.jpg" group-title="กีฬา Sport",FiFa World Cup 2
+https://hls.iptv-th.workers.dev/live/4214/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/o2qa4bnCEYLfyCljESW7o4nQOlBbbf11781185344_ed1b2be3ce913a6c2c9b.jpg" group-title="กีฬา Sport",FiFa World Cup 3
+https://hls.iptv-th.workers.dev/live/4213/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/eJlGsp8ZhReULGsXsgKEgcFVbNgJfWZ1781185355_5c8e9ffa15c40cede7bc.jpg" group-title="กีฬา Sport",FiFa World Cup 4
+https://hls.iptv-th.workers.dev/live/4212/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/8kMKaH9Zz9MtP2CBxdT0SaHRdHAsWg71781185367_a78a7614b72856ce525e.jpg" group-title="กีฬา Sport",FiFa World Cup 5
+https://hls.iptv-th.workers.dev/live/4211/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/atxatcvuRUiEDg8A2Lspfgoockd0xVI1781185381_94d42199e55abadc14ab.jpg" group-title="กีฬา Sport",FiFa World Cup 6
+https://hls.iptv-th.workers.dev/live/4210/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/qk6xeZIev0CrlRrlpzWIxrUYAPCfMjz1781185394_6741272adbea14408a83.jpg" group-title="กีฬา Sport",FiFa World Cup 7
+https://hls.iptv-th.workers.dev/live/4209/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/pC0SuS5eZjOQDsh8VyCGdY5lTtlChWC1781185407_3087faa855f5960e438d.jpg" group-title="กีฬา Sport",FiFa World Cup 8
+https://hls.iptv-th.workers.dev/live/4208/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/a15wFN31wjOoOb61XIh6Kz8kFqAwfinyuHJ0T69AHHoZJfvOzuOmXyA6V7tqIfvnl.png" group-title="กีฬา Sport",VNL
+https://hls.iptv-th.workers.dev/live/4206/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/tTI6wGIeOuqEtAwxbb9g6wsk1Z2n50Bimages.jpg" group-title="กีฬา Sport",AVC Cup
+https://hls.iptv-th.workers.dev/live/4219/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/tAujK8nTOcbcoAtNkr9HkgNZocQR9KC83b27d12-b594-485c-8ae8-0a7ebd3a4346.png" group-title="กีฬา Sport",NBA PPRIME
+https://hls.iptv-th.workers.dev/live/4205/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/Z3Cc3X5vNgz55S26YDrNbgGJwyIAyPG1778400202_5eafcb6bab5444f79b52.jpg" group-title="กีฬา Sport",Ais Play 41
+https://hls.iptv-th.workers.dev/live/4188/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/dSu9kcCQEDqxMGpepBReAuaXHgOfysV1779282671_bcc13f00c71f77102410.jpg" group-title="กีฬา Sport",Ais Play 48
+https://hls.iptv-th.workers.dev/live/4190/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/sorRldhiwOROcuIKoz0ilJ4NFF5gxXB1778323536_307b60a17c68dcd7bfe4.jpg" group-title="กีฬา Sport",Ais Play 55
+https://hls.iptv-th.workers.dev/live/4203/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/OfKznebimlAoTMqemCuAldrRaSG0gvv1778323547_b574499b0610076f178b.jpg" group-title="กีฬา Sport",Ais Play 56
+https://hls.iptv-th.workers.dev/live/4187/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/waKY39mKdIHWdz51xzI4B9MZ45GqAiz1778400897_898d3c6c29c32dafd506.jpg" group-title="กีฬา Sport",Ais Play 57
+https://hls.iptv-th.workers.dev/live/4191/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/GNbpFQaFHa2bohJ7JGKLiFCndh6b4gX1778400974_1b18c7fe03a32dcaedc6.jpg" group-title="กีฬา Sport",Ais Play 58
+https://hls.iptv-th.workers.dev/live/4192/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/XsbdxI6zGcRiVY6HjsNKdyhJuniw5Q41778323562_b6864f474d78b65cc27b.jpg" group-title="กีฬา Sport",Ais Play 61
+https://hls.iptv-th.workers.dev/live/4186/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/iFJRBbFyv1iX6Xqnh9NNVUt1Hc86eyg1778323575_bfffb7458766543034c7.jpg" group-title="กีฬา Sport",Ais Play 62
+https://hls.iptv-th.workers.dev/live/4185/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/Zc3bZrS9jqfFGGnbWfZ5D9PRWUkqF1k1778323586_68feff8b162984e503d0.jpg" group-title="กีฬา Sport",Ais Play 63
+https://hls.iptv-th.workers.dev/live/4184/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/FZdn4JakjmCk4waD99tcGJTNQ6fZawv1778349202_e7cf1c06f8020a2a6513.jpg" group-title="กีฬา Sport",Ais Play 64
+https://hls.iptv-th.workers.dev/live/4189/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/eILGfwJssGqMSqok2J8aai7jU8orAkY1778323619_360f3708561d63bd62b1.jpg" group-title="กีฬา Sport",Ais Play 66
+https://hls.iptv-th.workers.dev/live/4183/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/LDTpmlrlYpqMDgEgZWEIe3JzKIPbEGm1778323649_fba0da17f65a660e6f1d.jpg" group-title="กีฬา Sport",Ais Pay 69
+https://hls.iptv-th.workers.dev/live/4182/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/wa8WOqy9zyR6PLUTzsNY8bKL6leoWDO1778323666_047495696721f5b90518.jpg" group-title="กีฬา Sport",Ais Play 71
+https://hls.iptv-th.workers.dev/live/4181/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/TOCUECEHFGOJTmWrD4frZiSggDIc1Yc1778323678_a0750094187fc0b7cd20.jpg" group-title="กีฬา Sport",Ais Play 72
+https://hls.iptv-th.workers.dev/live/4180/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/nYH7AEm3tEOzQ5AR5ZLff9RWExBks7K1778323695_28e2ffa3f90395597a9b.jpg" group-title="กีฬา Sport",Ais Play 73
+https://hls.iptv-th.workers.dev/live/4179/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/UIBWhNoJ7PoVRRVrS46vPYfiEclAEKS1778323713_6c92b515171bffb2fbd4.jpg" group-title="กีฬา Sport",Ais Play 74
+https://hls.iptv-th.workers.dev/live/4178/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/OeFlCePOX9UcvLNBBq222LDkHRPeQAj1778323723_c93ffe65e328f02938b0.jpg" group-title="กีฬา Sport",Ais Play 75
+https://hls.iptv-th.workers.dev/live/4177/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/qgSQ3SjHb4Pla1yb4Vgy8g0F6VXFdAlebbad850-b303-11f0-b265-23dfa726a2d7_webp_original.png" group-title="กีฬา Sport",True Premier HD 3
+https://hls.iptv-th.workers.dev/live/4050/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/TlbYg0UbXXaCnQ7fNhakEKvXCEbQrDZec2fe140-b303-11f0-9a71-5d73f0864d0d_webp_original.png" group-title="กีฬา Sport",True Premier HD 4
+https://hls.iptv-th.workers.dev/live/3827/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/gyuyxpMF6QxUlTTiVwrdAj1BnkJxzZa20240418192615Bein1.jpg" group-title="กีฬา Sport",Bein Sport 1
+https://hls.iptv-th.workers.dev/live/3648/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/IFg1Ubafhzc1CcRhe48FUqJ1BjQSL8y20240418192624Bein2.jpg" group-title="กีฬา Sport",Bein Sport 2
+https://hls.iptv-th.workers.dev/live/3647/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/PaIhSj5IgqmG9bpEFTzq91kuqT1QNOx20240418192653Bein3.jpg" group-title="กีฬา Sport",Bein Sport 3
+https://hls.iptv-th.workers.dev/live/3646/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/nsahq9S3JEXGCRDcwFrYyzSMLAWwiiO20240418192706Bein4.jpg" group-title="กีฬา Sport",Bein Sport 4
+https://hls.iptv-th.workers.dev/live/3951/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/JD6IcfmNcpV2gP0hDWo8pY1gO4LzVH020240418192717Bein5.jpg" group-title="กีฬา Sport",Bein Sport 5
+https://hls.iptv-th.workers.dev/live/3952/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/t4eA6RmqgM5xRSVg6xnGBVw0yAUjJQD20240418192728Bein6.jpg" group-title="กีฬา Sport",Bein Sport 6
+https://hls.iptv-th.workers.dev/live/3953/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/1IfHqBLlzQsHGUfq79wcQ0R0fF4wQRi20240418195754Bein7.jpg" group-title="กีฬา Sport",Bein Sport 7
+https://hls.iptv-th.workers.dev/live/3954/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/5gkiIwawBNqrn2q5JhGK9WGu62SKSJl20240831143535Bein8.jpg" group-title="กีฬา Sport",Bein Sport 8
+https://hls.iptv-th.workers.dev/live/3955/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/D912OTM2VUXEUlPrgRKfVawkkc966Ow20240831143312Bein9.jpg" group-title="กีฬา Sport",Bein Sport 9
+https://hls.iptv-th.workers.dev/live/3956/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/pi6r9hmuyba77QTTV8cv3zSQ95B1xDb20240831143640Bein10.jpg" group-title="กีฬา Sport",Bein Sport 10
+https://hls.iptv-th.workers.dev/live/3957/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/veVkQGAOh0YHwrgJ2p3cVluTj1C9GjK20240418192933TrueSport1.jpg" group-title="กีฬา Sport",True Sport 1
+https://hls.iptv-th.workers.dev/live/1193/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/EDBxSp3h7WtfSIU33ZGg3yP1cnAdE5Y20240418192951TrueSport2.jpg" group-title="กีฬา Sport",True Sport 2
+https://hls.iptv-th.workers.dev/live/1135/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/00joOTu8g0RNc1kDJCXIxV3MtNHv9jw20240418193002TrueSport3.jpg" group-title="กีฬา Sport",True Sport 3
+https://hls.iptv-th.workers.dev/live/1136/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/ir7eXcali6fPYAvB9fb7nmMxcZaLYNb20240418193017TrueSport4.jpg" group-title="กีฬา Sport",True Sport 4
+https://hls.iptv-th.workers.dev/live/1137/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/AxVXCaKjdq7IULfTaywWPgE44BtSlsz20240418193030TrueSport5.jpg" group-title="กีฬา Sport",True Sport 5
+https://hls.iptv-th.workers.dev/live/1138/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/F4ROMKNcVaz2Nx2kxm3ziJOTUUHcG6X20240418193050TrueSport7.jpg" group-title="กีฬา Sport",True Sport 7
+https://hls.iptv-th.workers.dev/live/1139/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/ea3nZvfzvwSGAhBjKb7ZHIE8QM06mYk20240418193126SPOTV.jpg" group-title="กีฬา Sport",SportV
+https://hls.iptv-th.workers.dev/live/1122/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/8W2xlouyo3iQ1cj99jO6PORjFcbvyG920240418193135SPOTV2.jpg" group-title="กีฬา Sport",SportV 2
+https://hls.iptv-th.workers.dev/live/1123/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/A5nbeqF7igaugldmPelu1iceOOZSsvJ20240418193113Tennis.jpg" group-title="กีฬา Sport",True Tennis HD
+https://hls.iptv-th.workers.dev/live/1140/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/qnEWBmL7jgWjFGjK93q8P5DZWg27Fa61773301200_e31e7d5d7b7ae42ea2ad.jpg" group-title="กีฬา Sport",BG Sport 1
+https://hls.iptv-th.workers.dev/live/4158/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/v21vXcot7hP5xegdGxs3Hoqotw7lIAp1773406636_4cbce03dfdfc4be64d34.jpg" group-title="กีฬา Sport",BG Sport 2
+https://hls.iptv-th.workers.dev/live/4160/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/2VQi2WvnQrFgcOlxfY81pfxuz4T40UK1773406652_9c20feaa48661cb1979c.jpg" group-title="กีฬา Sport",BG Sport 3
+https://hls.iptv-th.workers.dev/live/4161/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/xCEcMEcGwFlgUJl79FnANor6btxzQrK1773406711_c80e7195ee41974a7013.jpg" group-title="กีฬา Sport",BG Sport 4
+https://hls.iptv-th.workers.dev/live/4162/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/2YRol5zh9fRMkO6DktRIKnGg6GKMJvw20240418192812Glof.jpg" group-title="กีฬา Sport",Golf Channel HD
+https://hls.iptv-th.workers.dev/live/3915/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/w0u99SO13Ccb6TFuo52DqLd4TFWpu2G20250830191812Wsport.jpg" group-title="กีฬา Sport",W-Sport
+https://hls.iptv-th.workers.dev/live/4171/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/T4GBf5vwHEuVtm9AgvwdBAdaElgVNBH1763214923_5a4895ab322d4b9daf31.jpg" group-title="กีฬา Sport",ONE Championship
+https://hls.iptv-th.workers.dev/live/4199/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/136rK3seQm5ihZY61oxSSKOxYCnmayP1779283056_071e40ef2a6c41b961ea.jpg" group-title="กีฬา Sport",Premier Sports
+https://hls.iptv-th.workers.dev/live/4202/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/Afo64PcHrfA79pSVekPCatAOhYjs6f4generated-image.png" group-title="กีฬา Sport",All Sport
+https://hls.iptv-th.workers.dev/live/4035/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/tCz5uOf1XPW1RLITmCX46urCatF7NbI20250830165328Mono1.jpg" group-title="กีฬา MonoMax",MonoMax 1
+https://hls.iptv-th.workers.dev/live/3912/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/2YYftpZ0wnosCHE1EIgZf5ktfrimdGJ20250830165343Mono2.jpg" group-title="กีฬา MonoMax",MonoMax 2
+https://hls.iptv-th.workers.dev/live/3911/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/1b9os9bBrsyci4RXjuHMgYPkWzFmnGj20250830165408Mono3.jpg" group-title="กีฬา MonoMax",MonoMax 3
+https://hls.iptv-th.workers.dev/live/3910/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/kXHgRq2PMqWhgjHMrf9WvnvztHEg22V20250830165433Mono4.jpg" group-title="กีฬา MonoMax",MonoMax 4
+https://hls.iptv-th.workers.dev/live/3909/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/UL61YrVJbiYLeaGPcPbn8oRbTYCgE1E20250830165451Mono5.jpg" group-title="กีฬา MonoMax",MonoMax 5
+https://hls.iptv-th.workers.dev/live/3908/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/INi6JlvfvAHn4UECVRA0mHfDnASEiuW20250830165513Mono6.jpg" group-title="กีฬา MonoMax",MonoMax 6
+https://hls.iptv-th.workers.dev/live/3907/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/9WAANVwTxTyhJ9Ep3IOuTWgkDGME54d20250830165536Mono7.jpg" group-title="กีฬา MonoMax",MonoMax 7
+https://hls.iptv-th.workers.dev/live/3906/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/GhVmL4iVr3rr5JsrOm6w2RpkyqKMvXS20250830165621Mono8.jpg" group-title="กีฬา MonoMax",MonoMax 8
+https://hls.iptv-th.workers.dev/live/3905/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/iXhTKaiiI28FnKABVrsnIpyEoKzUgYi20250904190235Monomax1.jpg" group-title="กีฬา MonoMax",MonoMax 1 Bk
+https://hls.iptv-th.workers.dev/live/3967/playlist.m3u8
+#EXTINF:-1 tvg-logo="https://goodiptv.site/images/tv/5s5D1e0kJBbgmzoyaofpHcuGjVkBYEh20250904190145Monomax2.jpg" group-title="กีฬา MonoMax",MonoMax 2 Bk
+https://hls.iptv-th.workers.dev/live/3970/playlist.m3u8
+#EXTINF:-1 tvg-log
+
+#EXTINF:-1 tvg-chno="1" tvg-id="iptv36.nbt" group-title="Thai Free TV" tvg-logo="https://iptv36.vercel.app/logo/nbt.png?v=4",NBT FHD
+https://cdn-edge.iiptvcdn.com/live_event/smil:1180-0c9c-ad1f-4e5d-aa48.smil/playlist.m3u8
+
+#EXTINF:-1 tvg-chno="2" tvg-id="iptv36.thaipbs" group-title="Thai Free TV" tvg-logo="https://iptv36.vercel.app/logo/thaipbs.png",Thai PBS FHD
+https://thaipbs-live.cdn.byteark.com/live/playlist.m3u8
+
+#EXTINF:-1 tvg-chno="3" tvg-id="iptv36.tv5" group-title="Thai Free TV" tvg-logo="https://iptv36.vercel.app/logo/tv5.png",TV5 FHD
+https://639bc5877c5fe.streamlock.net/tv5hdlive/tv5hdlive/playlist.m3u8
+
+#EXTINF:-1 tvg-chno="4" tvg-id="iptv36.tv5" group-title="Thai Free TV" tvg-logo="https://iptv36.vercel.app/logo/tv5.png",TV5 HD
+https://lb-gmmz.sky-cdn.com/gmm/ch5.m3u8
+
+#EXTINF:-1 tvg-chno="5" tvg-id="iptv36.tsports" group-title="Thai Free TV" tvg-logo="https://iptv36.vercel.app/logo/tsports.png",T-Sports
+https://lb-gmmz.sky-cdn.com/gmm/tsport7.m3u8
+
+#EXTINF:-1 tvg-chno="6" tvg-id="iptv36.tptv" group-title="Thai Free TV" tvg-logo="https://iptv36.vercel.app/logo/tptv.png",TPTV FHD
+https://tv-live.tpchannel.org/live/tv_1080p.m3u8?vhost=tv-live.tpchannel.org
+
+#EXTINF:-1 tvg-chno="7" tvg-id="iptv36.tptv" group-title="Thai Free TV" tvg-logo="https://iptv36.vercel.app/logo/tptv.png",TPTV
+https://lb-gmmz.sky-cdn.com/gmm/tptv.m3u8
+
+#EXTINF:-1 tvg-chno="8" tvg-id="iptv36.nbtcentral" group-title="Thai Free TV" tvg-logo="https://iptv36.vercel.app/logo/nbt.png?v=4",NBT Central FHD
+https://cdn-edge.iiptvcdn.com/live_event/smil:6ee0-5126-0cee-7ba2-18b7.smil/playlist.m3u8
+
+#EXTINF:-1 tvg-chno="9" tvg-id="iptv36.tnn16" group-title="Thai Free TV" tvg-logo="https://iptv36.vercel.app/logo/tnn16.png",TNN16
+https://lb-gmmz.sky-cdn.com/gmm/tnn16.m3u8
+
+#EXTINF:-1 tvg-chno="10" tvg-id="iptv36.nation" group-title="Thai Free TV" tvg-logo="https://iptv36.vercel.app/logo/nation.png",Nation TV FHD
+#EXTVLCOPT:http-referrer=https://www.nationtv.tv/
+https://nationtv-1jdcjo.cdn.byteark.com/fleetstream/nationtvlive/index.m3u8
+
+#EXTINF:-1 tvg-chno="11" tvg-id="iptv36.nation" group-title="Thai Free TV" tvg-logo="https://iptv36.vercel.app/logo/nation.png",Nation TV
+https://lb-gmmz.sky-cdn.com/gmm/nation.m3u8
+
+#EXTINF:-1 tvg-chno="12" tvg-id="iptv36.workpoint" group-title="Thai Free TV" tvg-logo="https://iptv36.vercel.app/logo/workpoint.png",Workpoint TV
+https://lb-gmmz.sky-cdn.com/gmm/workpoint.m3u8
+
+#EXTINF:-1 tvg-chno="13" tvg-id="iptv36.workpoint" group-title="Thai Free TV" tvg-logo="https://iptv36.vercel.app/logo/workpoint.png",Workpoint TV
+https://cco-streamer2.cdn.3bbtv.com:8443/3bb/live/23/23.mpd
+
+#EXTINF:-1 tvg-chno="14" tvg-id="iptv36.true4u" group-title="Thai Free TV" tvg-logo="https://iptv36.vercel.app/logo/true4u.png",True4U HD
+https://iptv36.vercel.app/api/true.m3u8?channel=true4u
+
+#EXTINF:-1 tvg-chno="15" tvg-id="iptv36.true4u" group-title="Thai Free TV" tvg-logo="https://iptv36.vercel.app/logo/true4u.png",True4U
+https://lb-gmmz.sky-cdn.com/gmm/true24.m3u8
+
+#EXTINF:-1 tvg-chno="16" tvg-id="iptv36.gmm25" group-title="Thai Free TV" tvg-logo="https://iptv36.vercel.app/logo/gmm25.png",GMM25 FHD
+https://fastly.live.brightcove.com/6392745120112/ap-southeast-1/6415628290001/eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJob3N0IjoicWN6dGF6LmVncmVzcy5wcHRpOHciLCJhY2NvdW50X2lkIjoiNjQxNTYyODI5MDAwMSIsImVobiI6ImZhc3RseS5saXZlLmJyaWdodGNvdmUuY29tIiwiaXNzIjoiYmxpdmUtcGxheWJhY2stc291cmNlLWFwaSIsInN1YiI6InBhdGhtYXB0b2tlbiIsImF1ZCI6WyI2NDE1NjI4MjkwMDAxIl0sImp0aSI6IjYzOTI3NDUxMjAxMTIifQ.w9Q_oqsE_WFClGF5tLVDtHnz5zfHHgNpumxVYNx4yYw/playlist-hls.m3u8
+
+#EXTINF:-1 tvg-chno="17" tvg-id="iptv36.gmm25" group-title="Thai Free TV" tvg-logo="https://iptv36.vercel.app/logo/gmm25.png",GMM25
+https://lb-gmmz.sky-cdn.com/gmm/gmm25.m3u8
+
+#EXTINF:-1 tvg-chno="18" tvg-id="iptv36.ch8" group-title="Thai Free TV" tvg-logo="https://iptv36.vercel.app/logo/ch8.png",CH8
+https://lb-gmmz.sky-cdn.com/gmm/ch8.m3u8
+
+#EXTINF:-1 tvg-chno="19" tvg-id="iptv36.ch8" group-title="Thai Free TV" tvg-logo="https://iptv36.vercel.app/logo/ch8.png",CH8
+https://cco-streamer2.cdn.3bbtv.com:8443/3bb/live/27/27.mpd
+
+#EXTINF:-1 tvg-chno="20" tvg-id="iptv36.mono29" group-title="Thai Free TV" tvg-logo="https://iptv36.vercel.app/logo/monomax.png",Monomax Sports FHD
+#EXTVLCOPT:http-user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/132.0.0.0 Safari/537.36 Edg/132.0.0.0
+https://live-tv.monomax.me/v1/019d38969c6c150b585a1f99efcb45/019e96a14f12150b585a122d294a26/main.m3u8
+
+#EXTINF:-1 tvg-chno="21" tvg-id="iptv36.mono29" group-title="Thai Free TV" tvg-logo="https://iptv36.vercel.app/logo/monomax.png",Monomax Sports
+https://cri-streamer3.cdn.3bbtv.com:8443/3bb/live/29/29.mpd
+
+#EXTINF:-1 tvg-chno="22" tvg-id="iptv36.mcot" group-title="Thai Free TV" tvg-logo="https://iptv36.vercel.app/logo/mcot.png",MCOT FHD
+https://cco-streamer2.cdn.3bbtv.com:8443/3bb/live/30/30.mpd
+
+#EXTINF:-1 tvg-chno="23" tvg-id="iptv36.mcot" group-title="Thai Free TV" tvg-logo="https://iptv36.vercel.app/logo/mcot.png",MCOT FHD
+https://mcothd-streaming-edge-cdn.mcot.net/tencentmcot/smil:tencentmcot.smil/playlist.m3u8
+
+#EXTINF:-1 tvg-chno="24" tvg-id="iptv36.one" group-title="Thai Free TV" tvg-logo="https://iptv36.vercel.app/logo/one.png",ONE FHD
+https://fastly.live.brightcove.com/6393158620112/ap-southeast-1/6415628290001/eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJob3N0IjoicWN6dGF6LmVncmVzcy5wcHRpOHciLCJhY2NvdW50X2lkIjoiNjQxNTYyODI5MDAwMSIsImVobiI6ImZhc3RseS5saXZlLmJyaWdodGNvdmUuY29tIiwiaXNzIjoiYmxpdmUtcGxheWJhY2stc291cmNlLWFwaSIsInN1YiI6InBhdGhtYXB0b2tlbiIsImF1ZCI6WyI2NDE1NjI4MjkwMDAxIl0sImp0aSI6IjYzOTMxNTg2MjAxMTIifQ.Pv-kHDlJaV05HiJ2AQmS3PnV2ZQg7ovszKptAGg1EN0/playlist-hls.m3u8
+
+#EXTINF:-1 tvg-chno="25" tvg-id="iptv36.one" group-title="Thai Free TV" tvg-logo="https://iptv36.vercel.app/logo/one.png",ONE HD
+https://lb-gmmz.sky-cdn.com/gmm/one.m3u8
+
+#EXTINF:-1 tvg-chno="26" tvg-id="iptv36.thairath" group-title="Thai Free TV" tvg-logo="https://iptv36.vercel.app/logo/thairath.png",Thairath TV FHD
+https://cri-streamer3.cdn.3bbtv.com:8443/3bb/live/32/32.mpd
+
+#EXTINF:-1 tvg-chno="27" tvg-id="iptv36.thairath" group-title="Thai Free TV" tvg-logo="https://iptv36.vercel.app/logo/thairath.png",Thairath TV HD
+#EXTVLCOPT:http-referrer=https://www.thairath.co.th/
+https://ssai-streaming.thairath.co.th/bamm-csai/720p/index.m3u8
+
+#EXTINF:-1 tvg-chno="28" tvg-id="iptv36.ch3" group-title="Thai Free TV" tvg-logo="https://iptv36.vercel.app/logo/ch3.png",CH3 HD
+https://lb-gmmz.sky-cdn.com/gmm/ch3.m3u8
+
+#EXTINF:-1 tvg-chno="29" tvg-id="iptv36.amarin" group-title="Thai Free TV" tvg-logo="https://iptv36.vercel.app/logo/amarin.png",Amarin TV FHD
+https://cri-streamer3.cdn.3bbtv.com:8443/3bb/live/34/34.mpd
+
+#EXTINF:-1 tvg-chno="30" tvg-id="iptv36.amarin" group-title="Thai Free TV" tvg-logo="https://iptv36.vercel.app/logo/amarin.png",Amarin TV HD
+https://lb-gmmz.sky-cdn.com/gmm/amarin.m3u8
+
+#EXTINF:-1 tvg-chno="31" tvg-id="iptv36.ch7" group-title="Thai Free TV" tvg-logo="https://iptv36.vercel.app/logo/ch7.png",CH7 FHD
+#EXTVLCOPT:http-referrer=https://www.ch7.com/
+https://live-cdn.ch7.com/out/v1/eafeb02c55b64a15b278b1e66c7fc776/playlist_9.m3u8
+
+#EXTINF:-1 tvg-chno="32" tvg-id="iptv36.ch7" group-title="Thai Free TV" tvg-logo="https://iptv36.vercel.app/logo/ch7.png",CH7 HD
+https://lb-gmmz.sky-cdn.com/gmm/ch7.m3u8
+
+#EXTINF:-1 tvg-chno="33" tvg-id="iptv36.pptv" group-title="Thai Free TV" tvg-logo="https://iptv36.vercel.app/logo/pptv.png",PPTV HD
+https://lb-gmmz.sky-cdn.com/gmm/pptv.m3u8
+`;
+
+// === แปลงข้อมูล M3U ===
+function parseM3U(data) {
+  const lines = data.trim().split('\n');
+  const channels = [];
+  for (let i = 0; i < lines.length; i++) {
+    if (lines[i].startsWith('#EXTINF')) {
+      const infoLine = lines[i];
+      const urlLine = (lines[i+1] || '').trim();
+      const logoMatch = infoLine.match(/tvg-logo="([^"]+)"/);
+      const groupMatch = infoLine.match(/group-title="([^"]+)"/);
+      const nameMatch = infoLine.match(/,\s*(.*)$/);
+      channels.push({
+        name: nameMatch ? nameMatch[1].trim() : 'ไม่ระบุ',
+        logo: logoMatch ? logoMatch[1] : '',
+        group: groupMatch ? groupMatch[1].trim() : 'อื่นๆ',
+        url: urlLine
+      });
+    }
+  }
+  return channels;
+}
+
+// === ตัวแปรหลัก ===
+const channels = parseM3U(m3uData);
+const videoPlayer = document.getElementById('videoPlayer');
+const channelList = document.getElementById('channelList');
+const categoryTab = document.getElementById('categoryTab');
+let currentCategory = 'all';
+let currentChannelIndex = -1;
+
+// === จัดกลุ่มช่องตามหมวดหมู่ ===
+const groups = {};
+channels.forEach((ch, idx) => {
+  if (!groups[ch.group]) groups[ch.group] = [];
+  groups[ch.group].push({ ...ch, index: idx });
+});
+
+// === สร้างปุ่มหมวดหมู่ ===
+Object.keys(groups).forEach(groupName => {
+  const btn = document.createElement('button');
+  btn.className = 'category-btn';
+  btn.dataset.category = groupName;
+  btn.textContent = groupName;
+  btn.onclick = () => switchCategory(groupName);
+  categoryTab.appendChild(btn);
+});
+
+// === เปลี่ยนหมวดหมู่ที่แสดง ===
+function switchCategory(catName) {
+  currentCategory = catName;
+  // อัปเดตสถานะปุ่ม
+  document.querySelectorAll('.category-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.category === catName);
+  });
+  // แสดง/ซ่อน กลุ่มช่อง
+  document.querySelectorAll('.channel-group').forEach(grp => {
+    grp.classList.toggle('hidden', catName !== 'all' && grp.dataset.group !== catName);
+  });
+}
+
+// === สร้างรายการช่อง แยกตามกลุ่ม ===
+Object.entries(groups).forEach(([groupName, items]) => {
+  const groupDiv = document.createElement('div');
+  groupDiv.className = 'channel-group';
+  groupDiv.dataset.group = groupName;
+
+  items.forEach(ch => {
+    const div = document.createElement('div');
+    div.className = 'channel-item';
+    div.setAttribute('tabindex', '0');
+    div.setAttribute('role', 'button');
+    div.setAttribute('aria-label', `ช่อง ${ch.name}`);
+    div.innerHTML = `
+      <img src="${ch.logo}" alt="${ch.name}" onerror="this.src='https://via.placeholder.com/60x36?text=📺'">
+      <div class="channel-name">${ch.name}</div>
+    `;
+    div.onclick = () => selectChannel(ch.index, div);
+    groupDiv.appendChild(div);
+  });
+
+  channelList.appendChild(groupDiv);
+});
+
+// === เล่นช่องที่เลือก ===
+function selectChannel(index, element) {
+  if (index < 0 || index >= channels.length) return;
+  currentChannelIndex = index;
+  const ch = channels[index];
+  videoPlayer.src = ch.url;
+  videoPlayer.play().catch(e => console.log('Autoplay blocked:', e));
+  // ไฮไลต์
+  document.querySelectorAll('.channel-item').forEach(el => el.classList.remove('active'));
+  if (element) element.classList.add('active');
+}
+
+// === ปุ่มควบคุมวิดีโอ ===
+document.getElementById('loadVideoBtn').addEventListener('click', () => {
+  const url = document.getElementById('videoInput').value.trim();
+  if (!url) return alert('กรุณากรอก URL ก่อนครับ');
+  videoPlayer.src = url;
+  videoPlayer.play().catch(e => alert('ไม่สามารถเล่นได้: ' + e.message));
+});
+
+document.getElementById('stretch').onclick = () => videoPlayer.style.objectFit = 'fill';
+document.getElementById('crop').onclick = () => videoPlayer.style.objectFit = 'cover';
+document.getElementById('zoom').onclick = () => {
+  videoPlayer.style.objectFit = (videoPlayer.style.objectFit === 'none') ? 'contain' : 'none';
+};
+document.getElementById('fullscreen').onclick = () => {
+  if (videoPlayer.requestFullscreen) videoPlayer.requestFullscreen();
+  else if (videoPlayer.webkitRequestFullscreen) videoPlayer.webkitRequestFullscreen();
+};
+</script>
+
+</body>
+</html>
